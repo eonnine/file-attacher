@@ -1,0 +1,364 @@
+/* variables */
+.file-attacher-container {
+    --main-height: 160px;
+    --preview-width: 90px;
+    --preview-height: 90px;
+    --widen-space-width: 62px;
+}
+
+/* common */
+.file-attacher-clickable {
+    cursor: default;
+}
+
+.file-attacher-hidden {
+    display: none;
+}
+
+
+/* container */
+.file-attacher-container {
+    box-sizing: border-box;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--main-height);
+}
+
+
+/* messsge */
+.file-attacher-container .file-attacher-message {
+    pointer-events: none;
+    position: absolute;
+    opacity: 0;
+    align-self: center;
+    font-size: 15px;
+}
+
+.file-attacher-container .file-attacher-frame:empty ~ .file-attacher-message {
+    opacity: 1;
+}
+
+
+/* frame */
+.file-attacher-frame {
+    cursor: pointer;
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    background-color: transparent;
+    padding: 13px 10px 10px 10px;
+    overflow: auto;
+    height: var(--main-height);
+    box-shadow: 0 1px 2px 2px rgba(0, 0, 0, 0.1);
+}
+
+.file-attacher-frame:active {
+    box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.1);
+}
+
+.file-attacher-frame::-webkit-scrollbar {
+    display: none;
+}
+
+.file-attacher-frame.dragging-comein {
+    box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.1);
+}
+
+
+/* preview */
+.file-attacher-preview {
+    box-sizing: border-box;
+    position: relative;
+    background-color: transparent;
+    display: inline-block;
+    vertical-align: top;
+    margin: 16px;
+    width: var(--preview-width);
+    height: var(--preview-height);
+}
+
+.file-attacher-preview.widen-to-left {
+    left: -15px;
+}
+
+.file-attacher-preview.widen-to-right {
+    left: 15px;
+}
+
+.file-attacher-preview.half-under::before {
+    content: "";
+    position: absolute;
+    width: var(--widen-space-width);
+    height: 100%;
+    top: 0px;
+    left: calc(var(--widen-space-width) * -1);
+}
+
+.file-attacher-preview.half-over::after {
+    content: "";
+    position: absolute;
+    width: var(--widen-space-width);
+    height: 100%;
+    top: 0px;
+    right: calc(var(--widen-space-width) * -1);
+}
+
+.file-attacher-frame.dragging .file-attacher-preview:not(.half-under,.half-over)::after {
+    content: "";
+    position: absolute;
+    width: calc(var(--widen-space-width) / 2);
+    height: 100%;
+    top: 0px;
+    right: calc((var(--widen-space-width) / 2) * -1) ;
+}
+
+
+/* preview - image */
+.file-attacher-preview .file-attacher-image {
+    pointer-events: none;
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgb(220, 220, 220), rgb(200, 200, 200));
+}
+
+.file-attacher-preview .file-attacher-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.file-attacher-preview:hover:not(.dragging) .file-attacher-image img {
+    transition: all 0.1s;
+    filter: blur(5px);
+}
+
+
+/* preview - details */
+.file-attacher-preview .file-attacher-details {
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    display: flex;
+    z-index: 20;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    opacity: 1;
+    font-size: 13px;
+    text-align: center;
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.file-attacher-preview:hover:not(.dragging) .file-attacher-details {
+    visibility: visible;
+}
+
+.file-attacher-preview .file-attacher-details .file-attacher-size {
+    width: 90%;
+    background-color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 1.2em;
+    font-size: 16px;
+}
+
+.file-attacher-preview .file-attacher-details .file-attacher-name {
+    width: 80%;
+    background-color: rgba(255, 255, 255, 0.4);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border: 1px solid transparent;
+}
+
+
+/* preview - progress bar */
+.file-attacher-preview .file-attacher-progress {
+    pointer-events: none;
+    opacity: 0;
+    z-index: 1000;
+    position: absolute;
+    height: 16px;
+    left: 50%;
+    top: 50%;
+    margin-top: -8px;
+    width: 80px;
+    margin-left: -40px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.file-attacher-preview.file-attacher-progressing:not(.file-attacher-complete) .file-attacher-progress {
+    opacity: 1;
+}
+
+.file-attacher-preview.file-attacher-progressing .file-attacher-progress .file-attacher-bar {
+    background: #fff;
+    display: block;
+    position: relative;
+    height: 100%;
+    width: 0;
+    border-radius: 17px;
+    background: linear-gradient(to bottom, rgb(102, 102, 102), rgb(68, 68, 68));
+    animation: add-file-progress 0.7s cubic-bezier(0.75, 0.2, 0.2, 1) forwards;
+}
+
+@keyframes add-file-progress {
+    0% {
+        width: 0px;
+    }
+
+    100% {
+        width: 80px;
+    }
+}
+
+
+/* preview - progress success mark */
+.file-attacher-preview .file-attacher-success-mark {
+    pointer-events: none;
+    opacity: 0;
+    z-index: 500;
+    position: absolute;
+    display: block;
+    top: 50%;
+    left: 50%;
+    margin-left: -27px;
+    margin-top: -27px;
+}
+
+.file-attacher-preview.file-attacher-progressing .file-attacher-success-mark:not(.file-attacher-success) {
+    animation: passing-through 3s cubic-bezier(0.77, 0, 0.175, 1);
+    animation-delay: 300ms;
+}
+
+@keyframes passing-through {
+    0% {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+
+    30%,
+    70% {
+        opacity: 1;
+        transform: translateY(0px);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-40px);
+    }
+}
+
+
+/* notizone */
+.file-attacher-container .file-attacher-notizone {
+    box-sizing: border-box;
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1000;
+    opacity: 1;
+    width: 100%;
+}
+
+
+/* noti - line type */
+.file-attacher-container .file-attacher-notizone .file-attacher-noti-line {
+    box-sizing: border-box;
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 21px;
+    line-height: 15px;
+    box-shadow: 0px 5px 10px 0px rgba(150, 150, 150, 0.5);
+    border-radius: 2px;
+    font-size: 13px;
+    padding: 2px;
+    text-align: center;
+    color: #fff;
+}
+
+.file-attacher-container .file-attacher-notizone .file-attacher-noti-line.info {
+    background: linear-gradient(to right, rgba(120, 220, 120, 0.3), rgba(120, 220, 120, 0.9), rgba(120, 220, 120, 0.3));
+}
+
+.file-attacher-container .file-attacher-notizone .file-attacher-noti-line.error {
+    background: linear-gradient(to right, rgba(255, 50, 50, 0.2), rgba(255, 50, 50, 0.7), rgba(255, 50, 50, 0.2));
+}
+
+.file-attacher-container .file-attacher-notizone .file-attacher-noti-line.show {
+    animation: show-message-line 2.5s;
+}
+
+@keyframes show-message-line {
+
+    0%,
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+
+/* noti - box type */
+.file-attacher-container .file-attacher-notizone.box {
+    width: auto;
+    height: calc(var(--main-height) + 10px);
+    overflow: hidden;
+}
+
+.file-attacher-container .file-attacher-notizone .file-attacher-noti-box {
+    position: relative;
+    opacity: 0;
+    top: -10px;
+    min-width: 100px;
+    box-shadow: 0px 7px 14px 1px rgba(150, 150, 150, 0.5);
+    padding: 5px 10px;
+    margin: 3px;
+    background-color: rgb(255, 255, 255, 0.8);
+    color: #000;
+    font-size: 14px;
+    border-radius: 2px;
+}
+
+.file-attacher-container .file-attacher-notizone .file-attacher-noti-box.show {
+    animation: show-message-box 2.5s;
+}
+
+.file-attacher-container .file-attacher-notizone .file-attacher-message-icon {
+    position: relative;
+    top: 2px;
+    margin-right: 7px;
+}
+
+@keyframes show-message-box {
+    0% {
+        opacity: 0;
+        top: -10px;
+    }
+
+    25%,
+    70% {
+        opacity: 1;
+        top: 0px;
+    }
+
+    100% {
+        opacity: 0;
+        top: -7px;
+    }
+}
