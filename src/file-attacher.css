@@ -120,7 +120,7 @@
     pointer-events: none;
     border-radius: 20px;
     overflow: hidden;
-    position: relative;
+    position: absolute;
     display: block;
     width: 100%;
     height: 100%;
@@ -186,41 +186,42 @@
     opacity: 0;
     z-index: 1000;
     position: absolute;
-    height: 16px;
-    left: 50%;
-    top: 50%;
-    margin-top: -8px;
-    width: 80px;
-    margin-left: -40px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 8px;
-    overflow: hidden;
+    width: 90px;
+    height: 90px;
+}
+
+.file-attacher-preview .file-attacher-progress svg {
+    transform: rotate(-90deg);
+}
+
+.file-attacher-preview .file-attacher-progress svg .file-attacher-progress-load {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.8);
+    stroke-width: 8;
+}
+
+.file-attacher-preview .file-attacher-progress svg .file-attacher-progress-bar {
+    fill: none;
+    stroke: rgba(150, 150, 150, 0.6);
+    stroke-linecap: round;
+    stroke-dasharray: 199;
+    stroke-width: 8;
 }
 
 .file-attacher-preview.file-attacher-progressing:not(.file-attacher-complete) .file-attacher-progress {
     opacity: 1;
-}
-
-.file-attacher-preview.file-attacher-progressing .file-attacher-progress .file-attacher-bar {
-    background: #fff;
-    display: block;
-    position: relative;
-    height: 100%;
-    width: 0;
-    border-radius: 17px;
-    background: linear-gradient(to bottom, rgb(102, 102, 102), rgb(68, 68, 68));
-    animation: add-file-progress 0.7s cubic-bezier(0.75, 0.2, 0.2, 1) forwards;
+    animation: add-file-progress 1s cubic-bezier(.3,.77,.78,.27);
 }
 
 @keyframes add-file-progress {
     0% {
-        width: 0px;
+      stroke-dashoffset: 190;
     }
-
+  
     100% {
-        width: 80px;
+      stroke-dashoffset: 0;
     }
-}
+  }
 
 
 /* preview - progress success mark */
@@ -237,26 +238,40 @@
 }
 
 .file-attacher-preview.file-attacher-progressing .file-attacher-success-mark:not(.file-attacher-success) {
-    animation: passing-through 3s cubic-bezier(0.77, 0, 0.175, 1);
-    animation-delay: 300ms;
+    animation: added-file 3s cubic-bezier(0.77, 0, 0.175, 1);
+    animation-delay: 600ms;
 }
 
-@keyframes passing-through {
+@keyframes added-file {
     0% {
         opacity: 0;
-        transform: translateY(40px);
+        transform: scale(0.7);
     }
 
-    30%,
-    70% {
+    50%,
+    80% {
         opacity: 1;
-        transform: translateY(0px);
+        transform: scale(1);
     }
 
     100% {
         opacity: 0;
-        transform: translateY(-40px);
+        transform: scale(1.17);
     }
+}
+
+
+/* preview - will saved mark */
+.file-attacher-preview .file-attacher-will-saved-mark {
+    pointer-events: none;
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    z-index: 1500;
+    top: 1px;
+    left: 1px;
+    border-radius: 50%;
+    background-color: rgb(20, 230, 20);
 }
 
 
@@ -317,7 +332,7 @@
 /* noti - box type */
 .file-attacher-container .file-attacher-notizone.box {
     width: auto;
-    height: calc(var(--main-height) + 10px);
+    max-height: calc(var(--main-height) + 10px);
     overflow: hidden;
 }
 

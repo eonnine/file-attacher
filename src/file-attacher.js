@@ -33,7 +33,7 @@
         scroll: true,
         noti: {
           use: true,
-          type: __layoutNotiType.LINE,
+          type: __layoutNotiType.BOX,
         },
       },
       validate: {
@@ -111,7 +111,8 @@
       };
 
       this.init();
-      return this.makeInterface();
+      this._callee = this.makeInterface();
+      return this._callee;
     }
 
     (function FileAttacherPrototype() {
@@ -145,10 +146,10 @@
         const baseHook = __getBaseConfig(name);
         const hook = this.getConfig(name);
 
-        if (isAllowGlobalHook && baseHook && await baseHook(hookParam) === false) {
+        if (isAllowGlobalHook && baseHook && await baseHook.call(this._callee, hookParam) === false) {
           return false;
         }
-        if (hook && baseHook !== hook && await hook(hookParam) === false) {
+        if (hook && baseHook !== hook && await hook.call(this._callee, hookParam) === false) {
           return false;
         }
         return true;
@@ -176,11 +177,10 @@
 
       this.storeObserver = async function (type, key, { target: file, toKey }) {
         if (type === __storeMutationType.PUT) {
-          const [preview, showProgress] = this._layout.createPreview(file._src, file.name, file.size);
-
-          this._layout
-            .bindPreviewEvent(preview)
-            .listen((...args) => this.previewEventListener(...args));
+          const [preview, showProgress] = this._layout
+            .createPreview(file._src, file.name, file.size, file._isNew)
+            .bindPreviewEvent((...args) => this.previewEventListener(...args))
+            .get();
 
           preview._key = key;
           file._$element = preview;
@@ -529,6 +529,8 @@
           getAddedFiles: this.getAddedFiles.bind(this),
           getRemovedIds: this.getRemovedIds.bind(this),
           addFiles: this.addFiles.bind(this),
+          printInfo: (message) => this._layout.printNotiInfo(this.getConfig('layout.noti.type'), message),
+          printError: (message) => this._layout.printNotiError(this.getConfig('layout.noti.type'), message),
           clear: ___Util.debounce(this.clear).bind(this),
         });
       }
@@ -700,22 +702,31 @@
           return input;
         }
 
-        this.createPreview = function (src, name, size) {
+        this.createPreview = function (src, name, size, isNewFile) {
           const preview = document.createElement('div');
           preview.classList.add('file-attacher-preview', 'file-attacher-image-preview');
           preview.setAttribute('title', name);
           preview.setAttribute('alt', name);
 
-          const image = this.createImage(src);
-          const detail = this.createDetail(name, size);
-          const progress = this.createProgress();
-          const successMark = this.createSuccessMark();
+          preview.appendChild(this.createImage(src));
+          preview.appendChild(this.createDetail(name, size));
+          preview.appendChild(this.createProgress());
+          preview.appendChild(this.createSuccessMark());
 
-          preview.appendChild(image);
-          preview.appendChild(detail);
-          preview.appendChild(progress);
-          preview.appendChild(successMark);
-          return [preview, () => preview.classList.add('file-attacher-progressing')];
+          if (isNewFile) {
+            preview.appendChild(this.createWillSavedMark());
+          }
+
+          const result = {
+            bindPreviewEvent: (fn) => {
+              this.bindPreviewEvent(preview).listen(fn);
+              return result;
+            },
+            get: () => {
+              return [preview, () => preview.classList.add('file-attacher-progressing')];
+            }
+          }
+          return result;
         }
 
         this.createDetail = function (name, size) {
@@ -774,10 +785,24 @@
           const progress = document.createElement('div');
           progress.classList.add('file-attacher-progress');
 
-          const bar = document.createElement('span');
-          bar.classList.add('file-attacher-bar');
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 120 128');
 
-          progress.appendChild(bar);
+          const load = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          load.classList.add('file-attacher-progress-load');
+          load.setAttribute('cx', '64');
+          load.setAttribute('cy', '64');
+          load.setAttribute('r', '32');
+
+          const bar = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          bar.classList.add('file-attacher-progress-bar');
+          bar.setAttribute('cx', '64');
+          bar.setAttribute('cy', '64');
+          bar.setAttribute('r', '32');
+
+          progress.appendChild(svg);
+          svg.appendChild(load);
+          svg.appendChild(bar);
           return progress;
         }
 
@@ -786,6 +811,12 @@
           wrap.classList.add('file-attacher-success-mark');
           wrap.appendChild(___IconFactory.createSuccessIcon());
           return wrap;
+        }
+
+        this.createWillSavedMark = function () {
+          const mark = document.createElement('div');
+          mark.classList.add('file-attacher-will-saved-mark');
+          return mark;
         }
 
         this.createDownloadLink = function (name, url) {
@@ -955,7 +986,7 @@
               $target.classList.add('file-attacher-complete');
               break;
               
-            case 'passing-through':
+            case 'added-file':
               e.target.classList.add('file-attacher-success');
               break;
           }
@@ -1547,12 +1578,12 @@
     (function IconFactory() {
       'use strict'
 
-      const createIcon = (color, d) => {
+      const createIcon = (color, viewBox, d) => {
         const wrap = document.createElement('span');
         wrap.classList.add('file-attacher-message-icon');
 
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '64 64 896 896');
+        svg.setAttribute('viewBox', viewBox);
         svg.setAttribute('focusable', 'false');
         svg.setAttribute('wdith', '15px');
         svg.setAttribute('height', '15px');
@@ -1567,29 +1598,27 @@
       }
 
       const createInfoIcon = () => {
-        return createIcon('#52c41a', 'M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm193.5 301.7l-210.6 292a31.8 31.8 0 01-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9 13.3l71.2 98.8 157.2-218c6-8.3 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z');
+        return createIcon('#52c41a', '0 0 480 480', 'M418.275,418.275c95.7-95.7,95.7-250.8,0-346.5s-250.8-95.7-346.5,0s-95.7,250.8,0,346.5S322.675,513.975,418.275,418.275z M157.175,207.575l55.1,55.1l120.7-120.6l42.7,42.7l-120.6,120.6l-42.8,42.7l-42.7-42.7l-55.1-55.1L157.175,207.575z');
       }
 
       const createErrorIcon = () => {
-        return createIcon('#ff4d4f', 'M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 618.2l-66-.3L512 563.4l-99.3 118.4-66.1.3c-4.4 0-8-3.5-8-8 0-1.9.7-3.7 1.9-5.2l130.1-155L340.5 359a8.32 8.32 0 01-1.9-5.2c0-4.4 3.6-8 8-8l66.1.3L512 464.6l99.3-118.4 66-.3c4.4 0 8 3.5 8 8 0 1.9-.7 3.7-1.9 5.2L553.5 514l130 155c1.2 1.5 1.9 3.3 1.9 5.2 0 4.4-3.6 8-8 8z');
+        return createIcon('#ff4d4f', '64 64 900 900', 'M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 618.2l-66-.3L512 563.4l-99.3 118.4-66.1.3c-4.4 0-8-3.5-8-8 0-1.9.7-3.7 1.9-5.2l130.1-155L340.5 359a8.32 8.32 0 01-1.9-5.2c0-4.4 3.6-8 8-8l66.1.3L512 464.6l99.3-118.4 66-.3c4.4 0 8 3.5 8 8 0 1.9-.7 3.7-1.9 5.2L553.5 514l130 155c1.2 1.5 1.9 3.3 1.9 5.2 0 4.4-3.6 8-8 8z');
       }
 
       const createSuccessIcon = () => {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 490.05 490.05');
+        svg.setAttribute('y', '0px');
         svg.setAttribute('width', '54px');
         svg.setAttribute('height', '54px');
 
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        group.setAttribute('fill-rule', 'evenodd');
-
         const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        iconPath.setAttribute('d', 'M23.5,31.8431458 L17.5852419,25.9283877 C16.0248253,24.3679711 13.4910294,24.366835 11.9289322,25.9289322 C10.3700136,27.4878508 10.3665912,30.0234455 11.9283877,31.5852419 L20.4147581,40.0716123 C20.5133999,40.1702541 20.6159315,40.2626649 20.7218615,40.3488435 C22.2835669,41.8725651 24.794234,41.8626202 26.3461564,40.3106978 L43.3106978,23.3461564 C44.8771021,21.7797521 44.8758057,19.2483887 43.3137085,17.6862915 C41.7547899,16.1273729 39.2176035,16.1255422 37.6538436,17.6893022 L23.5,31.8431458 Z M27,53 C41.3594035,53 53,41.3594035 53,27 C53,12.6405965 41.3594035,1 27,1 C12.6405965,1 1,12.6405965 1,27 C1,41.3594035 12.6405965,53 27,53 Z');
+        iconPath.setAttribute('d', 'M418.275,418.275c95.7-95.7,95.7-250.8,0-346.5s-250.8-95.7-346.5,0s-95.7,250.8,0,346.5S322.675,513.975,418.275,418.275z M157.175,207.575l55.1,55.1l120.7-120.6l42.7,42.7l-120.6,120.6l-42.8,42.7l-42.7-42.7l-55.1-55.1L157.175,207.575z');
         iconPath.setAttribute('stroke-opacity', '0.198794158');
         iconPath.setAttribute('fill-opacity', '0.816519475');
         iconPath.setAttribute('fill', '#FFFFFF');
 
-        svg.appendChild(group);
-        group.appendChild(iconPath);
+        svg.appendChild(iconPath);
         return svg;
       }
 
