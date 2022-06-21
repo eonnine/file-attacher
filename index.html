@@ -36,15 +36,15 @@
     fileIds: ['fileIdx', 'fileSeq'],
   });
 
-  const attcher = new FileAttacher('app', {
+  const attcher = new FileAttacher('app');
+
+  const attcher2 = new FileAttacher('app2',  {
     layout: {
       noti: {
-        type: 'box'
+        type: 'line'
       }
     },
   });
-
-  const attcher2 = new FileAttacher('app2');
 
   document.getElementById('event').addEventListener('click', listener.bind(this, attcher));
   document.getElementById('event2').addEventListener('click', listener.bind(this, attcher2));
