@@ -45,7 +45,7 @@ const attacher = new FileAttacher('element id', {...});
 ## Option
 |prop                              |type               |description        |default|
 |:---------------------------------|:------------------|:------------------|:------|
-|fileIds                           |```Array<String>```|<sib>파일의 식별자를 지정합니다.</sub>|[]
+|fileIds                           |```Array<String>```|파일의 식별자를 지정합니다. <br/> 예를 들어, DataBase의 기본키가 있습니다.[getRemovedIds](https://github.com/eonnine/file-attacher#api)로  삭제한 파일 식별자를 가져올 때, 이 속성에 정의한 필드에 매핑된 식별자 정보가 반환됩니다.|[]
 |url.fetch                         |```String```       |파일 목록을 가져올 URL|null
 |layout.scroll                     |```Boolean```      |파일 목록이 줄바꿈될 때 영역을 고정하고 스크롤을 생성할 지 여부입니다. 'false'일 때 스크롤이 생성되는 대신 영역이 확장됩니다.|true
 |layout.noti.use                   |```Boolean```      |알림 메세지의 사용 여부를 지정합니다.<br/> Hook을 이용하여 메세지를 직접 핸들링 할 수 있습니다.|true
