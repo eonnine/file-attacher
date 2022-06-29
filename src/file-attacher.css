@@ -332,8 +332,6 @@
 /* noti - box type */
 .file-attacher-container .file-attacher-notizone.box {
     width: auto;
-    max-height: calc(var(--main-height) + 10px);
-    overflow: hidden;
 }
 
 .file-attacher-container .file-attacher-notizone .file-attacher-noti-box {
@@ -341,7 +339,7 @@
     opacity: 0;
     top: -10px;
     min-width: 100px;
-    box-shadow: 0px 7px 14px 1px rgba(150, 150, 150, 0.5);
+    box-shadow: 0px 4px 9px 1px rgba(150, 150, 150, 0.5);
     padding: 5px 10px;
     margin: 3px;
     background-color: rgb(255, 255, 255, 0.8);
