@@ -208,7 +208,6 @@
     stroke-width: 8;
 }
 
-/* .style.animationDuration = "3s"; */
 .file-attacher-preview.file-attacher-progressing:not(.file-attacher-complete) .file-attacher-progress {
     opacity: 1;
     animation-name: add-file-progress;
@@ -241,8 +240,8 @@
 
 .file-attacher-preview.file-attacher-progressing .file-attacher-success-mark:not(.file-attacher-success) {
     animation-name: added-file;
+    animation-duration: 3s;
     animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
-    animation-delay: 600ms;
 }
 
 @keyframes added-file {

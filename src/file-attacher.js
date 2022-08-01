@@ -17,6 +17,9 @@
     
     const __defaultConfig = {
       fileIds: [],
+      xhr: {
+        configure: null,
+      },
       url: {
         fetch: null,
       },
@@ -71,6 +74,7 @@
 
     const __FileShape = {
       name: null,
+      type: null,
       size: 0,
       src: null,
     };
@@ -174,6 +178,7 @@
           this._store.put(name, {
             name,
             src,
+            type: newFile.type,
             size: newFile.size,
             file: newFile,
             isNew: true,
@@ -202,9 +207,11 @@
             return;
           }
           const newFile = this.extractIdObject(file);
+          
           this._store.put(file.name, {
             name: file.name,
-            src: file.src,
+            src: `data:${file.type};base64,${file.src}`,
+            type: file.type,
             size: file.size,
             file: newFile,
             isNew: false,
@@ -278,16 +285,8 @@
       this.downloadFile = async function (key) {
         const item = this._store.get(key);
         try {
-          const { name, src, isNew } = item;
-
-          if (isNew) {
-            this.downloadViaLink(name, src);  
-          } else {
-            const url = window.URL.createObjectURL(src);
-            this.downloadViaLink(name, url);
-            window.URL.revokeObjectURL(url);
-          }
-
+          const { name, src } = item;
+          this.downloadViaLink(name, src);  
           this.printDownloadSuccessMessage();
         } catch (e) {
           ___Log.error(e.message);
@@ -311,9 +310,9 @@
 
       this.clear = function () {
         this.removeAllFiles();
-        // this._store.clear();
-        // this._removedIdStore.clear();
-        // this._layout.clearInFrame();
+        this._store.clear();
+        this._removedIdStore.clear();
+        this._layout.clearInFrame();
       }
 
       this.findItem = function ($el) {
@@ -411,14 +410,15 @@
       }
 
       this.fetch = function (arg = { url: null, param: {}, setConfig: null }) {
-        const { url, param } = arg;
+        const { url, param, setConfig } = arg;
         const path = url ?? this.getConfig('url.fetch');
+        const xhrConfigure = this.getConfig('xhr.configure');
 
         if (!path) {
           ___Log.throwError(Error, `Not found fetch url. Set 'url.fetch' in configuration or pass 'url' property in parameter`);
         }
 
-        ___Ajax.get(path, param, setConfig).then(files => {
+        ___Ajax.get(path, param, setConfig, xhrConfigure).then(files => {
           this.addFiles(files);
         }).catch((e) => {
           ___Log.error(e);
@@ -527,7 +527,7 @@
       }
 
       this.makeInterface = function () {
-        return this.freeze({
+        return {
           id: this._id,
           fetch: this.fetch.bind(this),
           getAddedCount: this.getAddedCount.bind(this),
@@ -538,7 +538,7 @@
           addFiles: this.addFiles.bind(this),
           clear: this.clear.bind(this),
           destroy: this.destroy.bind(this),
-        });
+        };
       }
     }).call(FileAttacher.prototype);
 
@@ -724,7 +724,7 @@
 
           const progressDuration = this.getDurationRandomRange(5, 13);
           progress.style.animationDuration = `${progressDuration}s`;
-          successMark.style.animationDuration = `${progressDuration * 3}s`;
+          successMark.style.animationDelay = `${progressDuration - 0.4}s`;
 
           preview.appendChild(progress);
           preview.appendChild(successMark);
@@ -1502,10 +1502,10 @@
       'use strict'
 
       return {
-        get(url, param, setConfig) {
-          return this.xhr('GET', url, param, setConfig, this.setJsonProp).then(({ data }) => data);
+        get(url, param, setConfig, xhrConfigure) {
+          return this.xhr('GET', url, param, setConfig, xhrConfigure, this.setJsonProp).then(({ data }) => data);
         },
-        xhr(method, url, param, setConfig, setPropFn) {
+        xhr(method, url, param, setConfig, xhrConfigure, setPropFn) {
           return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
@@ -1523,6 +1523,10 @@
 
             xhr.open(method, url, true);
             setPropFn(xhr);
+
+            if (xhrConfigure) {
+              xhrConfigure(xhr);
+            }
 
             if (setConfig) {
               setConfig(xhr);
