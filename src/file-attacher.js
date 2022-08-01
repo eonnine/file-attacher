@@ -410,7 +410,7 @@
         });
       }
 
-      this.fetch = function (arg = { url: null, param: {} }) {
+      this.fetch = function (arg = { url: null, param: {}, setConfig: null }) {
         const { url, param } = arg;
         const path = url ?? this.getConfig('url.fetch');
 
@@ -418,7 +418,7 @@
           ___Log.throwError(Error, `Not found fetch url. Set 'url.fetch' in configuration or pass 'url' property in parameter`);
         }
 
-        ___Ajax.get(path, param).then(files => {
+        ___Ajax.get(path, param, setConfig).then(files => {
           this.addFiles(files);
         }).catch((e) => {
           ___Log.error(e);
@@ -1502,13 +1502,10 @@
       'use strict'
 
       return {
-        get(url, param) {
-          return this.xhr('GET', url, param, this.setJsonProp).then(({ data }) => data);
+        get(url, param, setConfig) {
+          return this.xhr('GET', url, param, setConfig, this.setJsonProp).then(({ data }) => data);
         },
-        getFile(url) {
-          return this.xhr('GET', url, null, this.setFileProp);
-        },
-        xhr(method, url, param, setPropFn) {
+        xhr(method, url, param, setConfig, setPropFn) {
           return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
@@ -1526,6 +1523,11 @@
 
             xhr.open(method, url, true);
             setPropFn(xhr);
+
+            if (setConfig) {
+              setConfig(xhr);
+            }
+            
             xhr.send(JSON.stringify(param));
           });
         },
