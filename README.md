@@ -46,6 +46,7 @@ const attacher = FileAttacher.create('element id', {...});
 |prop                              |type               |description        |default|
 |:---------------------------------|:------------------|:------------------|:------|
 |fileIds                           |```Array<String>```|파일의 식별자를 지정합니다. <br/> 예를 들어, DataBase의 기본키가 있습니다.[getRemovedIds](https://github.com/eonnine/file-attacher#api)로  삭제한 파일 식별자를 가져올 때, 이 속성에 정의한 필드에 매핑된 식별자 정보가 반환됩니다.|[]
+|readonly                          |```Boolean```      | 읽기 전용 모드를 사용합니다. <br/> 다운로드만 가능합니다.|false
 |xhr.configure                     |```Function```     |header등 xhr 통신에 관한 옵션을 설정합니다.| null
 |url.fetch                         |```String```       |파일 목록을 가져올 URL|null
 |layout.scroll                     |```Boolean```      |파일 목록이 줄바꿈될 때 영역을 고정하고 스크롤을 생성할 지 여부입니다. 'false'일 때 스크롤이 생성되는 대신 영역이 확장됩니다.|true
@@ -83,6 +84,8 @@ const attacher = FileAttacher.create('element id', {...});
 |addFiles        |```Function```|[알맞은 구조를 가진 파일 객체](https://github.com/eonnine/file-attacher#file)들을 목록에 추가합니다. 이 메서드를 통해 추가된 파일은 새 파일이 아닌 기존에 저장된 파일로 취급됩니다.|Array<[File](https://github.com/eonnine/file-attacher#file)>
 |clear           |```Function```|FilAttacher를 초기화합니다.
 |destroy         |```Function```|FilAttacher를 제거합니다.
+|readonly        |```Function```|읽기 전용 모드로 변경합니다.
+|enable          |```Function```|모든 기능을 사용할 수 있도록 변경합니다.
 
 
 ## File
