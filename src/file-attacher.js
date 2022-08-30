@@ -1,31 +1,25 @@
 (function (factory) {
   if(typeof exports === 'object' && typeof module === 'object') {
-    module.exports = factory();
+    module.exports = factory;
   }
   else if(typeof define === 'function' && define.amd) {
     define([], factory);
   }
   else if(typeof exports === 'object') {
-    exports["FileAttacher"] = factory();
+    exports["FileAttacher"] = factory;
   }
   else {
-    window['FileAttacher'] = factory();
+    window['FileAttacher'] = factory;
   }
 }(
-  (function FileAttacherFactory(___LayoutFactory, ___DoublyLinkedMapFactory, ___Util, ___Ajax, ___IconFactory, ___Log) {
+  (function FileAttacherFactory(___LayoutFactory, ___DoublyLinkedMapFactory, ___Util, ___Ajax, ___Log) {
     'use strict'
-
-    const __LayoutFactory = ___LayoutFactory(___IconFactory);
-    const __DoublyLinkedMapFactory = ___DoublyLinkedMapFactory();
-    const __layoutEventType = __LayoutFactory.eventType;
-    const __layoutNotiType = __LayoutFactory.notiType;
-    const __storeMutationType = __DoublyLinkedMapFactory.mutationType;
-    const __errorType = {
-      VALIDATOR: 'validator',
-      DOWNLOAD: 'download',
-    }
+    
     const __defaultConfig = {
       fileIds: [],
+      xhr: {
+        configure: null,
+      },
       url: {
         fetch: null,
       },
@@ -33,7 +27,7 @@
         scroll: true,
         noti: {
           use: true,
-          type: __layoutNotiType.BOX,
+          type: 'box',
         },
       },
       validate: {
@@ -59,14 +53,7 @@
       hook: {
         allowGlobal: true,
       },
-      onBeforeAddAll: ({ target: files }) => null,
-      onBeforeAdd: ({ target: file }) => null,
-      onAdded: ({ target: file }) => null,
-      onBeforeRemove: ({ target: file }) => null,
-      onRemoved: ({ target: file }) => null,
-      onBeforeChange: ({ target: file }) => null,
-      onChanged: ({ target: file }) => null,
-      onError: ({ type: errorType, message, target }) => null
+      onError: null,
     };
 
     const __getBaseConfig = function (keyChain) {
@@ -74,21 +61,20 @@
     }
 
     const __setBaseConfig = function (customConfig) {
-      let config;
       if (typeof customConfig === 'function') {
-        config = customConfig();
+        ___Util.mergeMap(__defaultConfig, customConfig());
+        return;
       }
-      else if (___Util.isObject(customConfig)) {
-        config = customConfig;
+      if (___Util.isObject(customConfig)) {
+        ___Util.mergeMap(__defaultConfig, customConfig);
+        return;
       }
-      else {
-        ___Log.throwError(TypeError, `Config type must be 'function' or 'object'`);
-      }
-      ___Util.mergeObject(__defaultConfig, config);
+      ___Log.throwError(TypeError, `Config type must be 'function' or 'object'`);
     }
 
     const __FileShape = {
       name: null,
+      type: null,
       size: 0,
       src: null,
     };
@@ -98,12 +84,15 @@
         ___Log.throwError(SyntaxError, '"new" constructor operator is required');
       }
       this.initValidator(elementId, option);
+      
+      this._util = ___Util;
+      this._layoutEventType = ___LayoutFactory.eventType;
 
       this._id = elementId;
       this._config = this.makeConfig(option);
-      this._layout = __LayoutFactory.create();
-      this._store = __DoublyLinkedMapFactory.create();
-      this._removedIdStore = __DoublyLinkedMapFactory.create();
+      this._layout = ___LayoutFactory.create();
+      this._store = ___DoublyLinkedMapFactory.create();
+      this._removedIdStore = ___DoublyLinkedMapFactory.create();
       this._state = {
         draggable: {
           currentKey: null,
@@ -116,25 +105,30 @@
     }
 
     (function FileAttacherPrototype() {
-      this.makeConfig = (option) => {
-        return ___Util.mergeMap(__defaultConfig, option);
+      this.errorType = {
+        VALIDATOR: 'validator',
+        DOWNLOAD: 'download',
+      }
+      
+      this.makeConfig = function(option) {
+        return this._util.mergeMap(__defaultConfig, option);
       }
 
       this.getConfig = function (keyChain) {
-        return ___Util.find(this._config, keyChain);
+        return this._util.find(this._config, keyChain);
       }
 
       this.getState = function (keyChain) {
-        return ___Util.find(this._state, keyChain);
+        return this._util.find(this._state, keyChain);
       }
 
       this.setState = function (keyChain, value) {
-        ___Util.setObject(this._state, keyChain, value);
+        this._util.setObject(this._state, keyChain, value);
       }
 
       this.extractIdObject = function (obj) {
         return this.getConfig('fileIds').reduce((acc, key) => {
-          if (___Util.hasProp(obj, key)) {
+          if (Object.prototype.hasOwnProperty.call(obj, key)) {
             acc[key] = obj[key];
           }
           return acc;
@@ -155,53 +149,19 @@
         return true;
       }
 
-      this.dispatchLifeCycle = function (name, target, optionalParam = {}) {
-        this.dispatchHook(name, { target, ...optionalParam });
-      }
-
-      this.dispatchError = function (name, type, message, target) {
+      this.dispatchError = function (name, type, message) {
         const { use: useNoti, type: notiType } = this.getConfig('layout.noti');
         if (useNoti) {
           this._layout.printNotiError(notiType, message);
         }
-        this.dispatchHook(name, { type, message, target });
+        this.dispatchHook(name, { type, message });
       }
 
       this.init = function () {
-        this._layout
-          .renderLayout(this._id, this.getConfig('layout'), this.getConfig('message'))
-          .bindFrameEvent((...args) => this.frameEventListener(...args))
-          .bindInputEvent((...args) => this.inputEventListener(...args));
-        this._store.onMutate((...args) => this.storeObserver(...args));
-      }
-
-      this.storeObserver = async function (type, key, { target: file, toKey }) {
-        if (type === __storeMutationType.PUT) {
-          const [preview, showProgress] = this._layout
-            .createPreview(file._src, file.name, file.size, file._isNew)
-            .bindPreviewEvent((...args) => this.previewEventListener(...args))
-            .get();
-
-          preview._key = key;
-          file._$element = preview;
-          this._layout.addPreview(file._$element);
-
-          if (file._isNew) {
-            showProgress();
-            await this.dispatchLifeCycle('onAdded', file);
-          }
-        }
-
-        else if (type === __storeMutationType.REMOVE) {
-          this._layout.removePreview(file._$element);
-          await this.dispatchLifeCycle('onRemoved', file);
-        }
-
-        else if (type === __storeMutationType.CHANGE) {
-          const toFile = this._store.get(toKey) ?? {};
-          this._layout.changePreviewPosition(file._$element, toFile._$element);
-          await this.dispatchLifeCycle('onChanged', file);
-        }
+        const { $frame, $input } = this._layout.renderLayout(this._id, this.getConfig('layout'), this.getConfig('message'));
+        this._layout.bindFrameEvent($frame);
+        this.bindFrameEvent($frame);
+        this.bindInputEvent($input);
       }
 
       this.addNewFiles = async function (files) {
@@ -209,167 +169,195 @@
           ___Log.error('Invalid file exists');
           return;
         }
-
-        if (await this.dispatchLifeCycle('onBeforeAddAll', files) === false) {
-          return;
-        }
-
+        
         Object.values(files).forEach(async file => {
-          if (await this.dispatchLifeCycle('onBeforeAdd', file) === false) {
-            return;
-          }
           const name = this.generateName(file.name);
           const src = await this.readFile(file);
           const newFile = this.createNewFile(name, file);
-          newFile._src = src;
-          newFile._isNew = true;
-          this._store.put(name, newFile);
+
+          this._store.put(name, {
+            name,
+            src,
+            type: newFile.type,
+            size: newFile.size,
+            file: newFile,
+            isNew: true,
+            element: null,
+          });
+          this.addFilePreview(name);
         });
       }
 
       this.addFiles = function (files) {
         if (!this.validateFileByConfig(files)) {
           ___Log.warn('Could not add files because of exists invalid file');
-          this.dispatchError('onError', __errorType.DOWNLOAD, this.getConfig('message.error.file_add'), file);
+          this.dispatchError('onError', this.errorType.DOWNLOAD, this.getConfig('message.error.file_add'));
           return;
         }
 
         files.forEach(file => {
           if (this.validateFileByShape(file)) {
             ___Log.error('Could not add invalid file', file);
-            this.dispatchError('onError', __errorType.DOWNLOAD, this.getConfig('message.error.file_add'), file);
+            this.dispatchError('onError', this.errorType.DOWNLOAD, this.getConfig('message.error.file_add'));
             return;
           }
           if (this._store.contains(file.name)) {
             ___Log.error('Colud not add same name file', file);
-            this.dispatchError('onError', __errorType.DOWNLOAD, this.getConfig('message.error.same_name'), file);
+            this.dispatchError('onError', this.errorType.DOWNLOAD, this.getConfig('message.error.same_name'));
             return;
           }
           const newFile = this.extractIdObject(file);
-          newFile.name = file.name;
-          newFile.size = file.size
-          newFile._src = file.src;
-          newFile._isNew = false;
-          this._store.put(newFile.name, newFile);
+          
+          this._store.put(file.name, {
+            name: file.name,
+            src: `data:${file.type};base64,${file.src}`,
+            type: file.type,
+            size: file.size,
+            file: newFile,
+            isNew: false,
+            element: null,
+          });
+          this.addFilePreview(file.name);
         });
       }
 
-      this.removeFile = async function (key) {
-        if (!this._store.contains(key)) {
-          this.warn('File matching the key does not exist');
-          return;
-        }
+      this.addFilePreview = async function(key) {
+        const item = this._store.get(key);
+        const preview = this._layout.createPreview(item.src, item.name, item.size, item.isNew);
+        item.element = preview;
 
-        const file = this._store.get(key);
-
-        if (await this.dispatchLifeCycle('onBeforeRemove', file) === false) {
-          return;
-        }
-
-        this._store.remove(key);
-
-        if (!file._isNew) {
-          const fileIds = this.extractIdObject(file);
-          this._removedIdStore.put(key, fileIds);
+        this.bindPreviewEvent(preview);
+        this._layout.bindPreviewEvent(preview);
+        this._layout.renderPreview(preview);
+        
+        if (item.isNew) {
+          this._layout.showProgress(preview);
         }
       }
 
-      this.changeFilePosition = async function (originKey, target, pointX, pointY) {
-        const cursorTargetKey = target._key;
-        let targetKey;
-
-        if (!originKey || !cursorTargetKey) {
-          return;
-        }
-
-        if (this._layout.isPointOverHalfRight({ x: pointX, y: pointY }, target)) {
-          targetKey = this._store.getNextKey(cursorTargetKey);
-        } else {
-          targetKey = cursorTargetKey;
-        }
-
-        if (await this.dispatchLifeCycle('onBeforeChange', this._store.get(originKey), { to: this._store.get(targetKey) }) === false) {
+      this.removeFile = function (key) {
+        if (!this._store.contains(key)) {
+          ___Log.warn('File matching the key does not exist');
           return;
         }
         
-        this._store.change(originKey, targetKey);
+        const item = this._store.get(key);
+        
+        if (!item.isNew) {
+          const fileIds = this.extractIdObject(item.file);
+          this._removedIdStore.put(key, fileIds);
+        }
+
+        this._layout.removePreview(item.element);
+        item.element.remove();
+        item.element = null;
+        item.file = null;
+        item.src = null;
+        this._store.remove(key);
+      }
+
+      this.removeAllFiles = function () {
+        for (let key in this._store.map){
+          this.removeFile(key);
+        }
+      }
+
+      this.changeFilePosition = async function (fromKey, toKey, pointX, pointY) {
+        if (!fromKey || !toKey) {
+          return;
+        }
+        
+        let newKey;
+        const toItem = this._store.get(toKey);
+        if (this._layout.isPointOverHalfRight(pointX, pointY, toItem.element.offsetWidth, toItem.element.getBoundingClientRect())) {
+          newKey = this._store.getNextKey(toKey);
+        } else {
+          newKey = toKey;
+        }
+        
+        this._store.change(fromKey, newKey);
+
+        const fromItem = this._store.get(fromKey);
+        const newItem = this._store.get(newKey);
+        this._layout.changePreviewPosition(fromItem.element, newItem?.element);
       }
 
       this.downloadFile = async function (key) {
-        const file = this._store.get(key);
+        const item = this._store.get(key);
         try {
-          const { name, _src } = file;
-          const blob = await ___Ajax.getFile(_src);
-          const url = window.URL.createObjectURL(blob);
-          this.downloadViaLink(name, url);
-          window.URL.revokeObjectURL(url);
-
-          const { use: useNoti, type: notiType } = this.getConfig('layout.noti');
-          const message = this.getConfig('message.info.download');
-          if (useNoti) {
-            this._layout.printNotiInfo(notiType, message);
-          }
+          const { name, src } = item;
+          this.downloadViaLink(name, src);  
+          this.printDownloadSuccessMessage();
         } catch (e) {
           ___Log.error(e.message);
-          this.dispatchError('onError', __errorType.DOWNLOAD, this.getConfig('message.error.download'), file);
+          this.dispatchError('onError', this.errorType.DOWNLOAD, this.getConfig('message.error.download'));
+        }
+      }
+
+      this.printDownloadSuccessMessage = function() {
+        const { use: useNoti, type: notiType } = this.getConfig('layout.noti');
+        if (useNoti) {
+          const message = this.getConfig('message.info.download');
+          this._layout.printNotiInfo(notiType, message);
         }
       }
 
       this.downloadViaLink = function(name, url) {
-        this._layout.createDownloadLink(name, url).click();
+        const link = this._layout.createDownloadLink(name, url);
+        link.click();
+        link.remove();
       }
 
       this.clear = function () {
+        this.removeAllFiles();
         this._store.clear();
         this._removedIdStore.clear();
-        this._layout.clearFrame();
+        this._layout.clearInFrame();
       }
 
-      this.frameEventListener = function (type, e) {
-        switch (type) {
-          case __layoutEventType.DRAG_END:
-            if (this._layout.isPointMoveOutFrame({ x: e.x, y: e.y })) {
-              this.removeFile(e.target._key);
-            }
-            break;
-
-          case __layoutEventType.DROP:
-            this.addNewFiles(e.dataTransfer.files);
-            break;
-        }
+      this.findItem = function ($el) {
+        return this._store.toArray().find(item => item.element === $el);
       }
 
-      this.previewEventListener = async function (type, e) {
-        switch (type) {
-          case __layoutEventType.DRAG_START:
-            this.setState('draggable.currentKey', e.target._key);
-            break;
-
-          case __layoutEventType.DRAG_END:
-            this.setState('draggable.currentKey', null);
-            break;
-
-          case __layoutEventType.DROP:
-            const originKey = this.getState('draggable.currentKey');
-            if (originKey) {
-              this.changeFilePosition(originKey, e.target, e.x, e.y);
-            }
-            break;
-
-          case __layoutEventType.DOUBLE_CLICK:
-            this.downloadFile(e.target._key);
-            break;
-        }
+      this.bindFrameEvent = function ($el) {
+        $el.addEventListener(this._layoutEventType.DRAG_END, e => {
+          if (this._layout.isPointMoveOut(e.x, e.y)) {
+            const item = this.findItem(e.target);
+            this.removeFile(item.name);
+          }
+        });
+        $el.addEventListener(this._layoutEventType.DROP, e => {
+          this.addNewFiles(e.dataTransfer.files);
+        });
       }
 
-      this.inputEventListener = function (type, e) {
-        switch (type) {
-          case __layoutEventType.INPUT:
-            this.addNewFiles(e.target.files).finally(() => {
-              e.target.value = null;
-            })
-            break;
-        }
+      this.bindPreviewEvent = function ($el) {
+        $el.addEventListener(this._layoutEventType.DRAG_START, e => {
+          const item = this.findItem(e.target);
+          this.setState('draggable.currentKey', item.name);
+        });
+        $el.addEventListener(this._layoutEventType.DRAG_END, () => {
+          this.setState('draggable.currentKey', null);
+        });
+        $el.addEventListener(this._layoutEventType.DROP, e => {
+          const fromKey = this.getState('draggable.currentKey');
+          if (fromKey) {
+            const toItem = this.findItem(e.target);
+            this.changeFilePosition(fromKey, toItem.name, e.x, e.y);
+          }
+        });
+        $el.addEventListener(this._layoutEventType.DOUBLE_CLICK, e => {
+          const item = this.findItem(e.target);
+          this.downloadFile(item.name);
+        });
+      }
+
+      this.bindInputEvent = function ($el) {
+        $el.addEventListener(this._layoutEventType.INPUT, e => {
+          this.addNewFiles(e.target.files).finally(() => {
+            e.target.value = null;
+          });
+        });
       }
 
       this.generateName = function (k) {
@@ -410,21 +398,27 @@
       this.readFile = function (file) {
         return new Promise(resolve => {
           const reader = new FileReader();
-          const onLoad = (e) => e.type === 'load' && resolve(e.target.result);
+          const onLoad = (e) => {
+            if (e.type === 'load') {
+              resolve(e.target.result);
+              reader.removeEventListener('load', onLoad);
+            }
+          };
           reader.addEventListener('load', onLoad);
           reader.readAsDataURL(file);
         });
       }
 
-      this.fetch = function (arg = { url: null, param: {} }) {
-        const { url, param } = arg;
+      this.fetch = function (arg = { url: null, param: {}, setConfig: null }) {
+        const { url, param, setConfig } = arg;
         const path = url ?? this.getConfig('url.fetch');
+        const xhrConfigure = this.getConfig('xhr.configure');
 
         if (!path) {
           ___Log.throwError(Error, `Not found fetch url. Set 'url.fetch' in configuration or pass 'url' property in parameter`);
         }
 
-        ___Ajax.get(path, param).then(files => {
+        ___Ajax.get(path, param, setConfig, xhrConfigure).then(files => {
           this.addFiles(files);
         }).catch((e) => {
           ___Log.error(e);
@@ -432,7 +426,7 @@
       }
 
       this.getAddedCount = function () {
-        return this._store.filter(({ value }) => value._isNew).length;
+        return this._store.toArray().filter(({ isNew }) => isNew).length;
       }
 
       this.containsAddedFile = function () {
@@ -444,7 +438,7 @@
       }
 
       this.getAddedFiles = function () {
-        return this._store.toArray().filter(({ _isNew }) => _isNew);
+        return this._store.toArray().filter(({ isNew }) => isNew).map(({ file }) => file);
       }
 
       this.getRemovedIds = function () {
@@ -478,7 +472,7 @@
         return ![
           ...Object.keys(__FileShape),
           ...this.getConfig('fileIds')
-          ].every(key => ___Util.hasProp(obj, key));
+          ].every(key => Object.prototype.hasOwnProperty.call(obj, key));
       }
 
       this.validateFileByConfig = function (files) {
@@ -493,25 +487,25 @@
 
           //추가할 파일의 크기와 파일크기제한 속성값 비교 (0이면 제한없음)
           if (validator.size > 0 && validator.size < file.size) {
-            this.dispatchError('onError', __errorType.VALIDATOR, this.getConfig('message.error.size_overflow'), file);
+            this.dispatchError('onError', this.errorType.VALIDATOR, this.getConfig('message.error.size_overflow'));
             return false;
           }
 
           //등록된 파일이 설정한 파일 개수보다 많은지 유효성 검증, 설정 개수가 0 이면 등록 개수 제한 없음
           if (validator.maxCount > 0 && validator.maxCount < storeSize) {
-            this.dispatchError('onError', __errorType.VALIDATOR, this.getConfig('message.error.count_overflow'), file);
+            this.dispatchError('onError', this.errorType.VALIDATOR, this.getConfig('message.error.count_overflow'));
             return false;
           }
 
           //허용된 확장자인지 체크 (허용된 확장자가 아니면 파일을 추가하지 않음)
           if (validator.includes.length > 0 && !validator.includes.includes(extention)) {
-            this.dispatchError('onError', __errorType.VALIDATOR, this.getConfig('message.error.invalid_extension'), file);
+            this.dispatchError('onError', this.errorType.VALIDATOR, this.getConfig('message.error.invalid_extension'));
             return false;
           }
 
           //제외 확장자에 포함되는지 체크 (제외 확장자에 포함된다면 추가하지 않음)
           if (validator.excludes.length > 0 && validator.excludes.includes(extention)) {
-            this.dispatchError('onError', __errorType.VALIDATOR, this.getConfig('message.error.invalid_extension'), file);
+            this.dispatchError('onError', this.errorType.VALIDATOR, this.getConfig('message.error.invalid_extension'));
             return false;
           }
         }
@@ -519,33 +513,46 @@
         return true;
       }
 
+      this.destroy = function () {
+        this.clear();
+        this._store.destroy();
+        this._removedIdStore.destroy();
+        this._layout.destroy();
+        for (let key in this) {
+          if (key.startsWith('_')) {
+            this[key] = null;
+            delete this[key];
+          }
+        }
+      }
+
       this.makeInterface = function () {
-        return this.freeze({
+        return {
           id: this._id,
-          fetch: ___Util.throttle(this.fetch).bind(this),
+          fetch: this.fetch.bind(this),
           getAddedCount: this.getAddedCount.bind(this),
           containsAdded: this.containsAddedFile.bind(this),
           containsRemoved: this.containsRemovedFile.bind(this),
           getAddedFiles: this.getAddedFiles.bind(this),
           getRemovedIds: this.getRemovedIds.bind(this),
           addFiles: this.addFiles.bind(this),
-          printInfo: (message) => this._layout.printNotiInfo(this.getConfig('layout.noti.type'), message),
-          printError: (message) => this._layout.printNotiError(this.getConfig('layout.noti.type'), message),
-          clear: ___Util.debounce(this.clear).bind(this),
-        });
+          clear: this.clear.bind(this),
+          destroy: this.destroy.bind(this),
+        };
       }
     }).call(FileAttacher.prototype);
 
-    FileAttacher.config = __setBaseConfig;
-
-    return function() {
-      return FileAttacher;
-    };
+    return {
+      config: __setBaseConfig,
+      create(id, options) {
+        return new FileAttacher(id, options);
+      }
+    }
   }(
 
 
 
-    (function LayoutFactory(___IconFactory) {
+    (function LayoutFactory() {
       'use strict'
 
       const __eventType = {
@@ -558,6 +565,7 @@
         DRAG_LEAVE: 'dragleave',
         DROP: 'drop',
         DOUBLE_CLICK: 'dblclick',
+        ANIMATION_END: 'animationend',
       };
 
       const __notiType = {
@@ -580,6 +588,8 @@
       function Layout() {
         this._$root = null;
         this._$dragging = null;
+        this._frameEvents = null;
+        this._inputEvents = null;
       }
 
       (function LayoutPrototype() {
@@ -669,8 +679,7 @@
               noti.classList.add('error')
               break;
           }
-
-          return [noti, () => noti.classList.add('show')];
+          return noti;
         }
 
         this.createNotiBox = function (messageType) {
@@ -682,15 +691,14 @@
 
           switch (messageType) {
             case __messageType.INFO:
-              noti.appendChild(___IconFactory.createInfoIcon());
+              noti.appendChild(this.createInfoIcon());
               break;
 
             case __messageType.ERROR:
-              noti.appendChild(___IconFactory.createErrorIcon());
+              noti.appendChild(this.createErrorIcon());
               break;
           }
-
-          return [noti, () => noti.classList.add('show')];
+          return noti;
         }
 
         this.createInput = function () {
@@ -710,23 +718,22 @@
 
           preview.appendChild(this.createImage(src));
           preview.appendChild(this.createDetail(name, size));
-          preview.appendChild(this.createProgress());
-          preview.appendChild(this.createSuccessMark());
+
+          const progress = this.createProgress();
+          const successMark = this.createSuccessMark();
+
+          const progressDuration = this.getDurationRandomRange(5, 13);
+          progress.style.animationDuration = `${progressDuration}s`;
+          successMark.style.animationDelay = `${progressDuration - 0.4}s`;
+
+          preview.appendChild(progress);
+          preview.appendChild(successMark);
 
           if (isNewFile) {
             preview.appendChild(this.createWillSavedMark());
           }
 
-          const result = {
-            bindPreviewEvent: (fn) => {
-              this.bindPreviewEvent(preview).listen(fn);
-              return result;
-            },
-            get: () => {
-              return [preview, () => preview.classList.add('file-attacher-progressing')];
-            }
-          }
-          return result;
+          return preview;
         }
 
         this.createDetail = function (name, size) {
@@ -747,7 +754,6 @@
           image.classList.add('file-attacher-image');
 
           const thumbnail = document.createElement('img');
-          thumbnail.addEventListener('error', (e) => e.target.remove());
           thumbnail.setAttribute('src', src);
 
           image.appendChild(thumbnail);
@@ -785,6 +791,13 @@
           const progress = document.createElement('div');
           progress.classList.add('file-attacher-progress');
 
+          let listener = e => {
+            e.target.classList.remove('file-attacher-progress');
+            e.target.removeEventListener('animationend', listener);
+            listener = null;
+          }
+          progress.addEventListener('animationend', listener);
+
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           svg.setAttribute('viewBox', '0 0 120 128');
 
@@ -806,10 +819,14 @@
           return progress;
         }
 
+        this.showProgress = function($el) {
+          $el.classList.add('file-attacher-progressing');
+        }
+
         this.createSuccessMark = function () {
           const wrap = document.createElement('div');
           wrap.classList.add('file-attacher-success-mark');
-          wrap.appendChild(___IconFactory.createSuccessIcon());
+          wrap.appendChild(this.createSuccessIcon());
           return wrap;
         }
 
@@ -843,168 +860,128 @@
 
           this.setRoot(root);
 
-          const result = {
-            bindFrameEvent: (fn) => {
-              this.bindFrameEvent(frame).listen(fn);
-              return result;
-            },
-            bindInputEvent: (fn) => {
-              this.bindInputEvent(input).listen(fn);
-              return result;
-            },
-          }
-          return result;
-        }
-
-        this.createEventListener = function (eventListener) {
-          let onEvents = null;
-          eventListener((...args) => onEvents && onEvents(...args));
           return {
-            listen: function (fn) {
-              onEvents = fn;
-              return this;
-            }.bind(this)
+            $frame: frame,
+            $input: input,
           }
         }
 
-        this.bindFrameEvent = function ($el) {
-          return this.createEventListener(onEvents => {
-            $el.addEventListener('click', () => {
-              this.getInput().click();
-            });
-
-            $el.addEventListener('dragover', (e) => {
-              this.preventEvent(e);
-            });
-
-            $el.addEventListener(__eventType.DRAG_START, (e) => {
-              this.startDrag(this.getFrame());
-            });
-
-            $el.addEventListener(__eventType.DRAG_END, (e) => {
-              this.endDrag(this.getFrame());
-              onEvents(__eventType.DRAG_END, e);
-            });
-
-            $el.addEventListener(__eventType.DRAG_ENTER, (e) => {
-              if (!this.isInnerDragging()) {
-                this.comeinDrag();
-              }
-            });
-
-            $el.addEventListener(__eventType.DRAG_LEAVE, (e) => {
-              if (this.isPointMoveOutFrame({ x: e.x, y: e.y })) {
-                this.gooutDrag();
-              }
-            });
-
-            $el.addEventListener(__eventType.DROP, (e) => {
-              this.preventEvent(e);
-              this.gooutDrag();
-              onEvents(__eventType.DROP, e);
-            });
-          });
-        }
-
-        this.bindInputEvent = function ($el) {
-          return this.createEventListener(onEvents => {
-            $el.addEventListener(__eventType.INPUT, (e) => {
-              onEvents(__eventType.INPUT, e);
-            });
-          });
+        this.removeEvents = function($el, events = {}) {
+          for (let eventName in events) {
+            $el.removeEventListener(eventName, events[eventName])
+            delete events[eventName];
+          }
         }
 
         this.bindPreviewEvent = function ($el) {
-          return this.createEventListener(onEvents => {
-            $el.setAttribute('draggable', true);
-
-            $el.addEventListener('click', (e) => this.preventEvent(e));
-
-            $el.addEventListener(__eventType.DOUBLE_CLICK, (e) => {
-              this.preventEvent(e);
-              onEvents(__eventType.DOUBLE_CLICK, e);
-            });
-
-            $el.addEventListener(__eventType.DRAG_START, (e) => {
-              e.dataTransfer.effectAllowed = 'move';
-              this.setCurrentDraggingElement(e.target);
-              this.startDrag(this.getFrame());
-              this.startDrag(e.target);
-              e.target.style.opacity = 0.2;
-              onEvents(__eventType.DRAG_START, e);
-            });
-
-            $el.addEventListener(__eventType.DRAG_END, (e) => {
-              this.setCurrentDraggingElement(null);
-              this.endDrag(this.getFrame());
-              this.endDrag(e.target);
-              e.target.style.opacity = 1;
-              onEvents(__eventType.DRAG_END, e);
-            });
-
-            $el.addEventListener(__eventType.DRAG_OVER, (e) => {
-              if (e.target === this.getCurrentDraggingElement()) {
-                return;
+          $el.setAttribute('draggable', true);
+          $el.addEventListener(__eventType.CLICK, e => {
+            e.preventDefault();
+            e.stopPropagation();
+          });
+          $el.addEventListener(__eventType.DOUBLE_CLICK, e => {
+            e.preventDefault();
+            e.stopPropagation();
+          });
+          $el.addEventListener(__eventType.DRAG_START, e => {
+            this.setCurrentDraggingElement(e.target);
+            this.startDrag(this.getFrame());
+            this.startDrag(e.target);
+            e.target.style.opacity = 0.2;
+          });
+          $el.addEventListener(__eventType.DRAG_END, e => {
+            this.setCurrentDraggingElement(null);
+            this.endDrag(this.getFrame());
+            this.endDrag(e.target);
+            e.target.style.opacity = 1;
+          });
+          $el.addEventListener(__eventType.DRAG_OVER, e => {
+            if (e.target === this.getCurrentDraggingElement()) {
+              return;
+            }
+            if (this.isInnerDragging()) {
+              if (this.isPointOverHalfRight(e.x, e.y, e.target.offsetWidth, e.target.getBoundingClientRect())) {
+                this.startOverHalfHoverOnDrag(e.target);
               }
-              
-              if (this.isInnerDragging()) {
-                if (this.isPointOverHalfRight({ x: e.x, y: e.y }, e.target)) {
-                  this.startOverHalfHoverOnDrag(e.target);
-                }
-                else {
-                  this.startUnderHalfHoverOnDrag(e.target);
-                }
+              else {
+                this.startUnderHalfHoverOnDrag(e.target);
               }
-            });
-
-            $el.addEventListener(__eventType.DRAG_LEAVE, (e) => {
-              if (this.isInnerDragging() && this.isHovering(e.target)) {
-                this.endHoverOnDrag(e.target);
-                this.endWidenSpace(e.target);
-              }
-            });
-
-            $el.addEventListener(__eventType.DROP, (e) => {
-              if (this.isInnerDragging() && this.isHovering(e.target)) {
-                this.endHoverOnDrag(e.target);
-                this.endWidenSpace(e.target);
-              }
-              onEvents(__eventType.DROP, e);
-            });
-
-            $el.addEventListener('animationend', (e) => this.progressAnimationEndEventListener($el, e));
+            }
+          });
+          $el.addEventListener(__eventType.DRAG_LEAVE, e => {
+            if (this.isInnerDragging() && this.isHovering(e.target)) {
+              this.endHoverOnDrag(e.target);
+              this.endWidenSpace(e.target);
+            }
+          });
+          $el.addEventListener(__eventType.DROP, e => {
+            if (this.isInnerDragging() && this.isHovering(e.target)) {
+              this.endHoverOnDrag(e.target);
+              this.endWidenSpace(e.target);
+            }
+          });
+          $el.addEventListener(__eventType.ANIMATION_END, e => {
+            e.target.classList.remove('file-attacher-success-mark');
+            e.target.remove();
           });
         }
 
+        this.bindFrameEvent = function ($el) {
+          $el.addEventListener(__eventType.CLICK, () => {
+            this.getInput().click()
+          });
+          $el.addEventListener(__eventType.DRAG_OVER, e => {
+            e.preventDefault();
+            e.stopPropagation();
+          });
+          $el.addEventListener(__eventType.DRAG_START, () => {
+            this.startDrag(this.getFrame());
+          });
+          $el.addEventListener(__eventType.DRAG_END, () => {
+            this.endDrag(this.getFrame());
+          });
+          $el.addEventListener(__eventType.DRAG_ENTER, () => {
+            if (!this.isInnerDragging()) {
+              this.comeInDrag();
+            }
+          });
+          $el.addEventListener(__eventType.DRAG_LEAVE, e => {
+            if (this.isPointMoveOut(e.x, e.y)) {
+              this.goOutDrag();
+            }
+          });
+          $el.addEventListener(__eventType.DROP, e => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.goOutDrag();
+          });
+        }
+
+        this.destroy = function () {
+          this.removeEvents(this.getFrame(), this._frameEvents);
+          this.removeEvents(this.getInput(), this._inputEvents);
+          this.clearInFrame();
+          this.getInput().remove();
+          this.getFrame().remove();
+          this.getNotizone().remove();
+          this.getMessage().remove();
+          this.getRoot().remove();
+          this._$root = null;
+          this._$dragging = null;
+          this._frameEvents = null;
+          this._inputEvents = null;
+        }
+
         this.bindNotiEvent = function ($el) {
-          $el.addEventListener('animationend', (e) => this.notizoneAnimationEndEventListener(e));
+          function animationendListener(e) {
+            e.target.classList.remove('show');
+            e.target.removeEventListener('animationend', animationendListener);
+            e.target.remove();
+          };
+          $el.addEventListener('animationend', animationendListener);
         }
 
-        this.progressAnimationEndEventListener = function ($target, e) {
-          switch (e.animationName) {
-            case 'add-file-progress':
-              $target.classList.add('file-attacher-complete');
-              break;
-              
-            case 'added-file':
-              e.target.classList.add('file-attacher-success');
-              break;
-          }
-        }
-
-        this.notizoneAnimationEndEventListener = function (e) {
-          switch (e.animationName) {
-            case 'show-message-line':
-              e.target.remove();
-              break;
-
-            case 'show-message-box':
-              e.target.remove();
-              break;
-          }
-        }
-
-        this.addPreview = function ($el) {
+        this.renderPreview = function ($el) {
           this.getFrame().appendChild($el);
         }
 
@@ -1022,9 +999,9 @@
           }
         }
 
-        this.printNoti = function ([noti, showNoti], message) {
+        this.printNoti = function (noti, message) {
           noti.insertAdjacentText('beforeend', message);
-          showNoti();
+          noti.classList.add('show');
           this.bindNotiEvent(noti);
           this.getNotizone().appendChild(noti);
         }
@@ -1037,25 +1014,24 @@
           this.printNoti(this.createNoti(notiType, __messageType.ERROR), message);
         }
 
-        this.clearFrame = function () {
-          this.getFrame().innerHTML = null;
+        this.clearInFrame = function () {
+          const $frame = this.getFrame();
+          let child = $frame.lastElementChild; 
+          while (child) {
+            $frame.removeChild(child);
+            child = $frame.lastElementChild;
+          }
         }
 
-        this.isPointMoveOutFrame = function (point) {
-          return this.isPointMoveOut(point, this.getFrame());
-        }
-
-        this.isPointMoveOut = function (point, $compare) {
-          const { x, y } = point;
-          const { left, right, top, bottom } = $compare.getBoundingClientRect();
+        this.isPointMoveOut = function (x, y) {
+          const { left, right, top, bottom } = this.getFrame().getBoundingClientRect();
           return x < left || x > right || y < top || y > bottom;
         }
 
-        this.isPointOverHalfRight = function (point, $compare) {
-          const { x, y } = point;
-          const { left, right, top, bottom } = $compare.getBoundingClientRect();
+        this.isPointOverHalfRight = function (x, y, offsetWidth, clientRect) {
+          const { left, right, top, bottom } = clientRect;
           return (
-            x > left + $compare.offsetWidth / 2 &&
+            x > left + offsetWidth / 2 &&
             x <= right + 62 &&
             y > top &&
             y < bottom
@@ -1079,11 +1055,11 @@
           $el.classList.remove('dragging');
         }
 
-        this.comeinDrag = function () {
+        this.comeInDrag = function () {
           this.getFrame().classList.add('dragging-comein');
         }
 
-        this.gooutDrag = function () {
+        this.goOutDrag = function () {
           this.getFrame().classList.remove('dragging-comein');
         }
 
@@ -1135,45 +1111,79 @@
             $el.nextSibling.classList.remove('widen-to-right');
           }
         }
+
+        const createIcon = (color, viewBox, d) => {
+          const wrap = document.createElement('span');
+          wrap.classList.add('file-attacher-message-icon');
+  
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', viewBox);
+          svg.setAttribute('focusable', 'false');
+          svg.setAttribute('wdith', '15px');
+          svg.setAttribute('height', '15px');
+          svg.setAttribute('fill', color);
+  
+          const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          iconPath.setAttribute('d', d);
+  
+          svg.appendChild(iconPath);
+          wrap.appendChild(svg);
+          return wrap;
+        }
+  
+        this.createInfoIcon = () => {
+          return createIcon('#52c41a', '0 0 480 480', 'M418.275,418.275c95.7-95.7,95.7-250.8,0-346.5s-250.8-95.7-346.5,0s-95.7,250.8,0,346.5S322.675,513.975,418.275,418.275z M157.175,207.575l55.1,55.1l120.7-120.6l42.7,42.7l-120.6,120.6l-42.8,42.7l-42.7-42.7l-55.1-55.1L157.175,207.575z');
+        }
+  
+        this.createErrorIcon = () => {
+          return createIcon('#ff4d4f', '64 64 900 900', 'M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 618.2l-66-.3L512 563.4l-99.3 118.4-66.1.3c-4.4 0-8-3.5-8-8 0-1.9.7-3.7 1.9-5.2l130.1-155L340.5 359a8.32 8.32 0 01-1.9-5.2c0-4.4 3.6-8 8-8l66.1.3L512 464.6l99.3-118.4 66-.3c4.4 0 8 3.5 8 8 0 1.9-.7 3.7-1.9 5.2L553.5 514l130 155c1.2 1.5 1.9 3.3 1.9 5.2 0 4.4-3.6 8-8 8z');
+        }
+  
+        this.createSuccessIcon = () => {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 490.05 490.05');
+          svg.setAttribute('y', '0px');
+          svg.setAttribute('width', '54px');
+          svg.setAttribute('height', '54px');
+  
+          const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          iconPath.setAttribute('d', 'M418.275,418.275c95.7-95.7,95.7-250.8,0-346.5s-250.8-95.7-346.5,0s-95.7,250.8,0,346.5S322.675,513.975,418.275,418.275z M157.175,207.575l55.1,55.1l120.7-120.6l42.7,42.7l-120.6,120.6l-42.8,42.7l-42.7-42.7l-55.1-55.1L157.175,207.575z');
+          iconPath.setAttribute('stroke-opacity', '0.198794158');
+          iconPath.setAttribute('fill-opacity', '0.816519475');
+          iconPath.setAttribute('fill', '#FFFFFF');
+  
+          svg.appendChild(iconPath);
+          return svg;
+        }
+
+        this.getDurationRandomRange = function (min, max) {
+          min = Math.ceil(min);
+          max = Math.floor(max);
+          return (Math.floor(Math.random() * (max - min)) + min) / 10;
+        }
       }).call(Layout.prototype)
 
       return {
-        notiType: __notiType,
         eventType: __eventType,
         create() {
           return new Layout();
         }
       };
-    }),
+    }()),
 
 
 
     (function DoublyLinkedMapFactory() {
       'use strict'
 
-      const __mutationType = {
-        PUT: 'put',
-        REMOVE: 'remove',
-        CHANGE: 'change',
-      }
-
       function DoublyLinkedMap() {
         this.head = null;
         this.tail = null;
         this.map = Object.create(null);
         this.length = 0;
-        this.mutateObserver = null;
-
-        return this.makeInterface();
       }
       (function DoublyLinkedMapPrototype() {
-        this.mutate = function (...args) {
-          if (this.mutateObserver && typeof this.mutateObserver === 'function') {
-            this.mutateObserver(...args);
-          }
-        }
-
-        this.putNode = function (k, v) {
+        this.put = function (k, v) {
           const node = {
             key: k,
             value: v,
@@ -1193,10 +1203,9 @@
 
           this.tail = node;
           this.length += 1;
-          return node;
         }
 
-        this.removeNode = function (k) {
+        this.remove = function (k) {
           const node = this.getNode(k);
 
           if (!node) {
@@ -1227,7 +1236,6 @@
 
           delete this.map[k];
           this.length -= 1;
-          return node;
         }
 
         this.changeNode = function (fromKey, toKey) {
@@ -1276,11 +1284,6 @@
           }
 
           toNode.prev = fromNode;
-          return fromNode;
-        }
-
-        this.onMutate = function (fn) {
-          this.mutateObserver = fn;
         }
 
         this.clear = function () {
@@ -1289,14 +1292,20 @@
           this.map = Object.create(null);
           this.length = 0;
         }
+        
+        this.destroy = function() {
+          this.head = null;
+          this.tail = null;
+          this.map = null;
+          this.length = null;
+        }
 
         this.size = function () {
           return this.length;
         }
 
         this.get = function (k) {
-          const node = this.getNode(k);
-          return node ? node.value : null;
+          return this.getNode(k)?.value;
         }
 
         this.getNode = function (k) {
@@ -1323,31 +1332,17 @@
           return Object.prototype.hasOwnProperty.call(this.map, k);
         }
 
-        this.put = function putNodeProxy(k, v) {
-          this.removeNode(k);
-          const node = this.putNode(k, v);
-          this.mutate(__mutationType.PUT, k, { target: node.value });
-        }
-
-        this.remove = function removeNodeProxy(k) {
-          const node = this.removeNode(k);
-          this.mutate(__mutationType.REMOVE, k, { target: node.value });
-        }
-
-        this.change = function changeNodeProxy(fromKey, toKey) {
+        this.change = function (fromKey, toKey) {
           if (fromKey === toKey) {
             return;
           }
-
-          let node;
           if (this.contains(toKey)) {
-            node = this.changeNode(fromKey, toKey);
+            this.changeNode(fromKey, toKey);
           } else {
             const fromValue = this.get(fromKey);
-            this.removeNode(fromKey);
-            node = this.putNode(fromKey, fromValue);
+            this.remove(fromKey);
+            this.put(fromKey, fromValue);
           }
-          this.mutate(__mutationType.CHANGE, fromKey, { target: node.value, toKey });
         }
 
         this.each = function (callBack = () => false) {
@@ -1389,32 +1384,14 @@
           });
           return array;
         }
-
-        this.makeInterface = function () {
-          return {
-            onMutate: this.onMutate.bind(this),
-            clear: this.clear.bind(this),
-            size: this.size.bind(this),
-            get: this.get.bind(this),
-            getNextKey: this.getNextKey.bind(this),
-            contains: this.contains.bind(this),
-            put: this.put.bind(this),
-            change: this.change.bind(this),
-            remove: this.remove.bind(this),
-            each: this.each.bind(this),
-            toArray: this.toArray.bind(this),
-            filter: this.filter.bind(this),
-          }
-        }
       }).call(DoublyLinkedMap.prototype);
 
       return {
-        mutationType: __mutationType,
         create() {
           return new DoublyLinkedMap();
         },
       };
-    }),
+    }()),
 
 
 
@@ -1422,9 +1399,6 @@
       'use strict'
 
       return {
-        hasProp(obj, key) {
-          return Object.prototype.hasOwnProperty.call(obj, key);
-        },
         isObject(v) {
           return v != null && !Array.isArray(v) && typeof v === 'object';
         },
@@ -1436,7 +1410,7 @@
           let result = object;
 
           for (const k of keys) {
-            if (result == null || !this.hasProp(result, k) || result[k] == null) {
+            if (result == null || !Object.prototype.hasOwnProperty.call(result, k) || result[k] == null) {
               result = defaultValue;
               break;
             }
@@ -1450,7 +1424,7 @@
           const lastKey = keys.pop();
 
           for (const k of keys) {
-            if (obj == null || !this.hasProp(obj, k)) {
+            if (obj == null || !Object.prototype.hasOwnProperty.call(obj, k)) {
               obj[k] = {};
             }
             obj = obj[k];
@@ -1461,9 +1435,12 @@
           } else {
             obj[lastKey] = v;
           }
+          obj = null;
+          keyChain = null;
+          v = null;
         },
         mergeMap(target, obj) {
-          return this.mergeObject(this.copy(target), this.copy(obj));
+          return this.copy(this.mergeObject(target, obj));
         },
         mergeArray(target = [], arr = []) {
           return [...target, ...arr];
@@ -1516,23 +1493,6 @@
             return acc;
           }, {});
         },
-        debounce(fn, sleep = 0) {
-          let debounceFn = null;
-          return function (...args) {
-            window.clearTimeout(debounceFn);
-            debounceFn = window.setTimeout(() => fn.apply(this, args), sleep);
-          };
-        },
-        throttle(fn, sleep = 1000) {
-          let running = false;
-          return function (...args) {
-            if (!running) {
-              running = true;
-              fn.apply(this, args);
-              setTimeout(() => running = false, sleep);
-            }
-          }
-        }
       }
     }()),
 
@@ -1542,20 +1502,20 @@
       'use strict'
 
       return {
-        get(url, param) {
-          return this.xhr('GET', url, param, this.setJsonProp).then(({ data }) => data);
+        get(url, param, setConfig, xhrConfigure) {
+          return this.xhr('GET', url, param, setConfig, xhrConfigure, this.setJsonProp).then(({ data }) => data);
         },
-        getFile(url) {
-          return this.xhr('GET', url, null, this.setFileProp);
-        },
-        xhr(method, url, param, setPropFn) {
+        xhr(method, url, param, setConfig, xhrConfigure, setPropFn) {
           return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
-            xhr.onload = (e) => {
+            function onLoad(e) {
               const { readyState, status, response } = e.target;
               readyState == 4 && status == 200 ? resolve(response) : reject(xhr);
+              xhr.removeEventListener('load', onLoad);
             }
+
+            xhr.addEventListener('load', onLoad);
 
             xhr.onerror = function (e) {
               reject(e);
@@ -1563,6 +1523,15 @@
 
             xhr.open(method, url, true);
             setPropFn(xhr);
+
+            if (xhrConfigure) {
+              xhrConfigure(xhr);
+            }
+
+            if (setConfig) {
+              setConfig(xhr);
+            }
+            
             xhr.send(JSON.stringify(param));
           });
         },
@@ -1573,61 +1542,6 @@
           xhr.responseType = 'blob';
         }
       }
-    }()),
-
-    (function IconFactory() {
-      'use strict'
-
-      const createIcon = (color, viewBox, d) => {
-        const wrap = document.createElement('span');
-        wrap.classList.add('file-attacher-message-icon');
-
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', viewBox);
-        svg.setAttribute('focusable', 'false');
-        svg.setAttribute('wdith', '15px');
-        svg.setAttribute('height', '15px');
-        svg.setAttribute('fill', color);
-
-        const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        iconPath.setAttribute('d', d);
-
-        svg.appendChild(iconPath);
-        wrap.appendChild(svg);
-        return wrap;
-      }
-
-      const createInfoIcon = () => {
-        return createIcon('#52c41a', '0 0 480 480', 'M418.275,418.275c95.7-95.7,95.7-250.8,0-346.5s-250.8-95.7-346.5,0s-95.7,250.8,0,346.5S322.675,513.975,418.275,418.275z M157.175,207.575l55.1,55.1l120.7-120.6l42.7,42.7l-120.6,120.6l-42.8,42.7l-42.7-42.7l-55.1-55.1L157.175,207.575z');
-      }
-
-      const createErrorIcon = () => {
-        return createIcon('#ff4d4f', '64 64 900 900', 'M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 618.2l-66-.3L512 563.4l-99.3 118.4-66.1.3c-4.4 0-8-3.5-8-8 0-1.9.7-3.7 1.9-5.2l130.1-155L340.5 359a8.32 8.32 0 01-1.9-5.2c0-4.4 3.6-8 8-8l66.1.3L512 464.6l99.3-118.4 66-.3c4.4 0 8 3.5 8 8 0 1.9-.7 3.7-1.9 5.2L553.5 514l130 155c1.2 1.5 1.9 3.3 1.9 5.2 0 4.4-3.6 8-8 8z');
-      }
-
-      const createSuccessIcon = () => {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 490.05 490.05');
-        svg.setAttribute('y', '0px');
-        svg.setAttribute('width', '54px');
-        svg.setAttribute('height', '54px');
-
-        const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        iconPath.setAttribute('d', 'M418.275,418.275c95.7-95.7,95.7-250.8,0-346.5s-250.8-95.7-346.5,0s-95.7,250.8,0,346.5S322.675,513.975,418.275,418.275z M157.175,207.575l55.1,55.1l120.7-120.6l42.7,42.7l-120.6,120.6l-42.8,42.7l-42.7-42.7l-55.1-55.1L157.175,207.575z');
-        iconPath.setAttribute('stroke-opacity', '0.198794158');
-        iconPath.setAttribute('fill-opacity', '0.816519475');
-        iconPath.setAttribute('fill', '#FFFFFF');
-
-        svg.appendChild(iconPath);
-        return svg;
-      }
-
-      return {
-        createInfoIcon,
-        createErrorIcon,
-        createSuccessIcon,
-      };
-
     }()),
 
 

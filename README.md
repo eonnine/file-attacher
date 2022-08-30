@@ -22,7 +22,7 @@ import FileAttacher from 'file-attacher';
 <div id="app"></div>
 
 <script>
-    const attacher = new FileAttacher('app');
+    const attacher = FileAttacher.create('app');
 </script>
 ```
 
@@ -35,7 +35,7 @@ FileAttacher.config(baseOption);
 
  // local
 const localOption = {...};
-const attacher = new FileAttacher('element id', {...});
+const attacher = FileAttacher.create('element id', {...});
 ```
 - 전역 설정은 모든 'FileAttacher'을 사용할 때 적용되며 각 인스턴스 생성 시 [option](https://github.com/eonnine/file-attacher#option)객체를 통해 '재정의'할 수 있습니다.
 - 단, 'Hook'은 Global Hook이 호출된 후 Local Hook이 실행되는 것에 주의합니다.
@@ -46,6 +46,7 @@ const attacher = new FileAttacher('element id', {...});
 |prop                              |type               |description        |default|
 |:---------------------------------|:------------------|:------------------|:------|
 |fileIds                           |```Array<String>```|파일의 식별자를 지정합니다. <br/> 예를 들어, DataBase의 기본키가 있습니다.[getRemovedIds](https://github.com/eonnine/file-attacher#api)로  삭제한 파일 식별자를 가져올 때, 이 속성에 정의한 필드에 매핑된 식별자 정보가 반환됩니다.|[]
+|xhr.configure                     |```Function```     |header등 xhr 통신에 관한 옵션을 설정합니다.| null
 |url.fetch                         |```String```       |파일 목록을 가져올 URL|null
 |layout.scroll                     |```Boolean```      |파일 목록이 줄바꿈될 때 영역을 고정하고 스크롤을 생성할 지 여부입니다. 'false'일 때 스크롤이 생성되는 대신 영역이 확장됩니다.|true
 |layout.noti.use                   |```Boolean```      |알림 메세지가 상황에 맞게 자동 출력될 지 여부를 지정합니다. <br/> Hook을 이용하여 메세지를 직접 핸들링 할 수 있습니다.|true
@@ -65,14 +66,7 @@ const attacher = new FileAttacher('element id', {...});
 |message.error.same_name           |```String```    |동일한 이름의 파일을 추가하려고 할 때 보여지는 메세지입니다. <br/> 기존에 저장된 파일을 가져오거나 [addFiles](https://github.com/eonnine/file-attacher#api)를 통해 파일을 추가할 때 적용됩니다. <br/> 새로운 파일을 추가할 때는 동일한 이름의 파일이 존재할 경우, 파일명에 넘버링이 자동으로 부여됩니다.|'동일한 이름의 파일이 존재합니다'
 ||||
 |Hook                              |                |'this'를 통해 자신의 인스턴스에 접근할 수 있습니다.
-|onBeforeAddAll                    |```Function```  |새 파일들이 추가되기 전 실행됩니다. <br/> 인자 객체에 추가될 파일 목록이 전달됩니다. 'false' 반환시 파일들은 추가되지 않습니다. |({ target: [[File](https://github.com/eonnine/file-attacher#file)] }) => null
-|onBeforeAdd                       |```Function```  |새 파일이 추가되기 전 실행됩니다. <br/>'onBeforeAddAll'는 전체 파일 목록이 대상이지만 'onBeforeAdd'은 추가되는 과정에서 각각의 파일을 대상으로 합니다. <br/> 인자 객체에 추가될 파일이 전달됩니다. 'false' 반환시 해당 파일은 추가되지 않습니다. |({ target: [File](https://github.com/eonnine/file-attacher#file) }) => null
-|onAdded                           |```Function```  |새 파일이 추가된 후 실행됩니다. 인자 객체에 추가된 파일이 전달됩니다. |({ target: [File](https://github.com/eonnine/file-attacher#file) }) => null
-|onBeforeRemove                    |```Function```  |파일이 삭제되기 전 실행됩니다. <br/> 인자 객체에 삭제될 파일이 전달됩니다. 'false' 반환시 해당 파일은 삭제되지 않습니다. |({ target: [File](https://github.com/eonnine/file-attacher#file) }) => null
-|onRemoved                         |```Function```  |파일이 삭제된 후 실행됩니다. 인자 객체에 삭제된 파일이 전달됩니다. |({ target: [File](https://github.com/eonnine/file-attacher#file) }) => null
-|onBeforeChange                    |```Function```  |Drag&Drop으로 파일의 순서를 변경할 때, 변경 전에 실행됩니다. <br/> 인자 객체에 순서가 변경된 대상 파일, 변경 목표 위치에 있던 파일이 전달됩니다. <br/> 이 때, 목표 위치의 파일은 항상 자리가 바뀐 대상 파일의 다음 파일입니다. 예를 들어 마지막 칸으로 이동한 대상 파일의 목표 위치 파일은 존재하지 않습니다. <br/> 'false' 반환시 순서는 변경되지 않습니다. |({ target: [File](https://github.com/eonnine/file-attacher#file), to: [File](https://github.com/eonnine/file-attacher#file) }) => null
-|onChanged                         |```Function```  |Drag&Drop으로 파일의 순서가 변경된 후 실행됩니다. 인자 객체에 순서가 변경된 파일이 전달됩니다. |({ target: 파일 }) => null
-|onError                           |```Function```  |에러 발생 시 실행됩니다. 인자 객체에 에러 관련 정보가 전달됩니다. <br/> `type: ['validator', 'download']` |({ <br/>&nbsp; type: 에러 타입, <br/>&nbsp; message: 에러 메시지, <br/>&nbsp; target: 에러 대상 객체 <br/> }) => null
+|onError                           |```Function```  |에러 발생 시 실행됩니다. 인자 객체에 에러 관련 정보가 전달됩니다. <br/> `type: ['validator', 'download']` |({ <br/>&nbsp; type: 에러 타입, <br/>&nbsp; message: 에러 메시지, <br/> }) => null
 
 ## API
 - 생성된 FileAttacher 인스턴스에서 제공되는 API입니다.
@@ -88,8 +82,7 @@ const attacher = new FileAttacher('element id', {...});
 |getRemovedIds   |```Function```|삭제된 파일들의 id값들을 Array로 가져옵니다. <br/> 각 요소는 [fileIds](https://github.com/eonnine/file-attacher#option)에서 정의한 필드에 따라 생성됩니다.
 |addFiles        |```Function```|[알맞은 구조를 가진 파일 객체](https://github.com/eonnine/file-attacher#file)들을 목록에 추가합니다. 이 메서드를 통해 추가된 파일은 새 파일이 아닌 기존에 저장된 파일로 취급됩니다.|Array<[File](https://github.com/eonnine/file-attacher#file)>
 |clear           |```Function```|FilAttacher를 초기화합니다.
-|printInfo       |```Function```|안내 알림 메시지를 출력합니다.|message: String
-|printError      |```Function```|실패 알림 메시지를 출력합니다.|message: String
+|destroy         |```Function```|FilAttacher를 제거합니다.
 
 
 ## File
@@ -97,6 +90,7 @@ const attacher = new FileAttacher('element id', {...});
 ```typescript
 File {
     name: String,
+    type: String, // ex) image/png
     size: Number,
     src: String, // file path | file Data URIs
     fileIds...

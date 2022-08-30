@@ -18,6 +18,7 @@
     <button name="containsAdded">containsAdded</button>
     <button name="containsRemoved">containsRemoved</button>
     <button name="clear">clear</button>
+    <button name="destroy">destroy</button>
   </div>
   <div id="app"></div>
 
@@ -36,9 +37,9 @@
     fileIds: ['fileIdx', 'fileSeq'],
   });
 
-  const attcher = new FileAttacher('app');
+  const attcher = FileAttacher.create('app');
 
-  const attcher2 = new FileAttacher('app2',  {
+  const attcher2 = FileAttacher.create('app2',  {
     layout: {
       noti: {
         type: 'line'
@@ -46,8 +47,10 @@
     },
   });
 
-  document.getElementById('event').addEventListener('click', listener.bind(this, attcher));
-  document.getElementById('event2').addEventListener('click', listener.bind(this, attcher2));
+  const l1 = listener.bind(this, attcher);
+  const l2 = listener.bind(this, attcher2);
+  document.getElementById('event').addEventListener('click', l1);
+  document.getElementById('event2').addEventListener('click', l2);
 
   function listener(fileAttcher, e) {
     const methodName = e.target.name;
@@ -55,8 +58,8 @@
     if (methodName === 'addFiles') {
       addFilesTo(fileAttcher);
     }
-    else if (methodName === 'clear') {
-      fileAttcher[methodName]()
+    else if (methodName === 'clear' || methodName === 'destroy') {
+      fileAttcher[methodName]();
     }
     else {
       const result = fileAttcher[methodName]();
@@ -68,6 +71,7 @@
     s.addFiles(new Array(2).fill({}).map((_, i) => ({
         name: `Fake File (${i})`,
         size: 1000000,
+        type: 'image/png',
         src: 'error',
         fileIdx: 1,
         fileSeq: i,

@@ -210,7 +210,8 @@
 
 .file-attacher-preview.file-attacher-progressing:not(.file-attacher-complete) .file-attacher-progress {
     opacity: 1;
-    animation: add-file-progress 1s cubic-bezier(.3,.77,.78,.27);
+    animation-name: add-file-progress;
+    animation-timing-function: cubic-bezier(.3,.77,.78,.27);
 }
 
 @keyframes add-file-progress {
@@ -238,8 +239,9 @@
 }
 
 .file-attacher-preview.file-attacher-progressing .file-attacher-success-mark:not(.file-attacher-success) {
-    animation: added-file 3s cubic-bezier(0.77, 0, 0.175, 1);
-    animation-delay: 600ms;
+    animation-name: added-file;
+    animation-duration: 3s;
+    animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 @keyframes added-file {
