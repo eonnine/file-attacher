@@ -17,6 +17,7 @@
     
     const __defaultConfig = {
       fileIds: [],
+      readonly: false,
       xhr: {
         configure: null,
       },
@@ -116,6 +117,10 @@
 
       this.getConfig = function (keyChain) {
         return this._util.find(this._config, keyChain);
+      }
+
+      this.setConfig = function (keyChain, value) {
+        this._util.setObject(this._config, keyChain, value);
       }
 
       this.getState = function (keyChain) {
@@ -320,13 +325,25 @@
       }
 
       this.bindFrameEvent = function ($el) {
+        $el.addEventListener(this._layoutEventType.CLICK, () => {
+          if (this.isInactive()) {
+            return
+          };
+          this._layout.getInput().click();
+        });
         $el.addEventListener(this._layoutEventType.DRAG_END, e => {
+          if (this.isInactive()) {
+            return;
+          }
           if (this._layout.isPointMoveOut(e.x, e.y)) {
             const item = this.findItem(e.target);
             this.removeFile(item.name);
           }
         });
         $el.addEventListener(this._layoutEventType.DROP, e => {
+          if (this.isInactive()) {
+            return
+          };
           this.addNewFiles(e.dataTransfer.files);
         });
       }
@@ -340,6 +357,9 @@
           this.setState('draggable.currentKey', null);
         });
         $el.addEventListener(this._layoutEventType.DROP, e => {
+          if (this.isInactive()) {
+            return;
+          }
           const fromKey = this.getState('draggable.currentKey');
           if (fromKey) {
             const toItem = this.findItem(e.target);
@@ -525,6 +545,20 @@
           }
         }
       }
+      
+      this.readonly = function () {
+        this.setConfig('readonly', true);
+        this._layout.inactive();
+      }
+
+      this.enable = function () {
+        this.setConfig('readonly', false);
+        this._layout.active();
+      }
+
+      this.isInactive = function () {
+        return this.getConfig('readonly');
+      }
 
       this.makeInterface = function () {
         return {
@@ -538,6 +572,8 @@
           addFiles: this.addFiles.bind(this),
           clear: this.clear.bind(this),
           destroy: this.destroy.bind(this),
+          readonly: this.readonly.bind(this),
+          enable: this.enable.bind(this),
         };
       }
     }).call(FileAttacher.prototype);
@@ -632,7 +668,7 @@
         this.createFrame = function ({ scroll = true }) {
           const frame = document.createElement('div');
           frame.setAttribute('name', __elementName.FRAME);
-          frame.classList.add('file-attacher-frame');
+          frame.classList.add('file-attacher-frame', 'active');
 
           if (!scroll) {
             frame.style.height = 'auto';
@@ -893,6 +929,7 @@
             this.setCurrentDraggingElement(null);
             this.endDrag(this.getFrame());
             this.endDrag(e.target);
+            this.endWidenSpace(e.target);
             e.target.style.opacity = 1;
           });
           $el.addEventListener(__eventType.DRAG_OVER, e => {
@@ -927,9 +964,6 @@
         }
 
         this.bindFrameEvent = function ($el) {
-          $el.addEventListener(__eventType.CLICK, () => {
-            this.getInput().click()
-          });
           $el.addEventListener(__eventType.DRAG_OVER, e => {
             e.preventDefault();
             e.stopPropagation();
@@ -996,6 +1030,20 @@
             this.getFrame().appendChild($from);
           } else {
             this.getFrame().insertBefore($from, $to);
+          }
+        }
+
+        this.active = function () {
+          const $frame = this.getFrame();
+          if (!$frame.classList.contains('active')) {
+            $frame.classList.add('active');
+          }
+        }
+
+        this.inactive = function () {
+          const $frame = this.getFrame();
+          if ($frame.classList.contains('active')) {
+            $frame.classList.remove('active');
           }
         }
 
@@ -1440,7 +1488,7 @@
           v = null;
         },
         mergeMap(target, obj) {
-          return this.copy(this.mergeObject(target, obj));
+          return this.mergeObject(this.copy(target), this.copy(obj));
         },
         mergeArray(target = [], arr = []) {
           return [...target, ...arr];

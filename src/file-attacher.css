@@ -51,11 +51,11 @@
     padding: 13px 10px 10px 10px;
     overflow: auto;
     height: var(--main-height);
-    box-shadow: 0 1px 2px 2px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.1);
 }
 
-.file-attacher-frame:active {
-    box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.1);
+.file-attacher-frame.active:active {
+    box-shadow: 0 0 3px 1px rgba(0, 0, 0, 0.1);
 }
 
 .file-attacher-frame::-webkit-scrollbar {
