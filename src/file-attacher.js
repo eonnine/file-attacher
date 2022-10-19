@@ -15,7 +15,7 @@
   (function FileAttacherFactory(___LayoutFactory, ___DoublyLinkedMapFactory, ___Util, ___Ajax, ___Log) {
     'use strict'
     
-    const __defaultConfig = {
+    let __defaultConfig = {
       fileIds: [],
       readonly: false,
       xhr: {
@@ -63,11 +63,11 @@
 
     const __setBaseConfig = function (customConfig) {
       if (typeof customConfig === 'function') {
-        ___Util.mergeMap(__defaultConfig, customConfig());
+        __defaultConfig = ___Util.mergeMap(__defaultConfig, customConfig());
         return;
       }
       if (___Util.isObject(customConfig)) {
-        ___Util.mergeMap(__defaultConfig, customConfig);
+        __defaultConfig = ___Util.mergeMap(__defaultConfig, customConfig);
         return;
       }
       ___Log.throwError(TypeError, `Config type must be 'function' or 'object'`);
