@@ -280,6 +280,10 @@
           newKey = toKey;
         }
         
+        if (fromKey === newKey) {
+          return;
+        }
+
         this._store.change(fromKey, newKey);
 
         const fromItem = this._store.get(fromKey);
